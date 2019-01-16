@@ -14,6 +14,7 @@ SetWorkingDir, % A_ScriptDir
 SplitPath, A_ScriptFullPath, , OutDir, , OutNameNoExt
 ini          := % OutDir "\" OutNameNoExt ".ini"
 MainmenuName := "Fav_Folders"
+Menu, % MainmenuName, UseErrorLevel
 ;---------------------------------------------------------------------------------------------------
 /*
 * Add Section [Project]
@@ -24,7 +25,7 @@ If project
 {
     Loop, Parse, % project, `n, `r
     {
-        pos := InStr(A_LoopField, "=", , , 1)
+        pos        := InStr(A_LoopField, "=", , , 1)
         Menu_key   := SubStr(A_LoopField, 1, pos-1)
         Menu_value := SubStr(A_LoopField, pos+1)
         project_Lists[Menu_key] := Menu_value
@@ -32,7 +33,6 @@ If project
         If FileExist(Menu_value)
         {
             Folder2Menu(Menu_value,MainmenuName,Menu_key)
-            SetIcon(MainmenuName,Menu_key,Menu_value)
         }
     }
     Menu, % MainmenuName, Add
@@ -47,16 +47,20 @@ If Menu_Items
 {
     Loop, parse, % Menu_Items, `n, `r
     {
-        pos := InStr(A_LoopField, "=", , , 1)
+        pos        := InStr(A_LoopField, "=", , , 1)
         Menu_key   := SubStr(A_LoopField, 1, pos-1)
         Menu_value := SubStr(A_LoopField, pos+1)
         Menu_Lists[Menu_key] := Menu_value
 
         Menu, % MainmenuName, Add, % Menu_key, Menu_Fav
         If Not FileExist(Menu_value)
+        {
             Menu, % MainmenuName, Disable, % Menu_key
+        }
         Else
-            SetIcon("Fav_Folders",Menu_key,Menu_value)
+        {
+            SetIcon(MainmenuName,Menu_key,Menu_value)
+        }
     }
     Menu, % MainmenuName, Add
 }
@@ -64,18 +68,18 @@ If Menu_Items
 ;     MsgBox %key% = %value%
 ;---------------------------------------------------------------------------------------------------
 /*
-* Add Section [øÏΩ›∂Ã”Ô]
+* Add Section [QuickPhrases]
 */
-IniRead, øÏΩ›∂Ã”Ô   , % ini, øÏΩ›∂Ã”Ô
-If øÏΩ›∂Ã”Ô
+IniRead, QuickPhrases, % ini, QuickPhrases
+If QuickPhrases
 {
-    Loop, parse, % øÏΩ›∂Ã”Ô, `n, `r
+    Loop, parse, % QuickPhrases, `n, `r
     {
-        Menu, øÏΩ›∂Ã”Ô, Add, % A_LoopField, Menu_Fav
+        Menu, QuickPhrases, Add, % A_LoopField, Menu_Fav
     }
-    Menu, % MainmenuName, Add, øÏΩ›∂Ã”Ô, :øÏΩ›∂Ã”Ô
+    Menu, % MainmenuName, Add, QuickPhrases, :QuickPhrases
+    Menu, % MainmenuName, Add
 }
-Menu, % MainmenuName, Add
 ;---------------------------------------------------------------------------------------------------
 /*
 * Add Section [Settings]
@@ -91,6 +95,7 @@ Menu, % MainmenuName, Add, &Config, Menu_Fav
 Menu, % MainmenuName, Icon, &Config, % FileExist(ConfigIcon)?ConfigIcon:"", , 16
 
 Menu, % MainmenuName, Show
+F1::Menu, % MainmenuName, Show
 Return
 
 
@@ -123,7 +128,7 @@ Menu_Fav:
         Else
             Run % "Edit " A_ScriptFullPath
     }
-    If (A_ThisMenu = "øÏΩ›∂Ã”Ô") || (A_ThisMenu = "emoji")
+    If (A_ThisMenu = "QuickPhrases") || (A_ThisMenu = "emoji")
     {
         Send % "{Bind}{Text}" A_ThisMenuItem
     }
@@ -132,43 +137,43 @@ Menu_Fav:
 /*
 *
 */
-Folder2Menu(path,MainmenuName,MainMenuItem:="") {
-    global project_Lists
-    for i, obj in GetDir(path)
+Folder2Menu(path,MainmenuName,MainMenuItem) {
+    If GetDir(path).Length()
     {
-        menuItemPath     := obj.arr_path
-        menuName         := obj.arr_menu
-        submenuName      := obj.arr_item
-        Label_or_Submenu := "Menuhandler"
-        Menu % menuName, Add, % submenuName, % Label_or_Submenu
-        ; Msgbox % "1Menu " menuName ", Add, " submenuName ", " Label_or_Submenu
-
-        project_Lists[menuName] := path
-        ; msgbox % "1project_Lists[" submenuName "]:=" path
-        SetIcon(menuName,submenuName,menuItemPath)
-
-        If InStr(obj.arr_menu, "\")
+        global project_Lists
+        for i, obj in GetDir(path)
         {
-            If (DllCall("GetMenuItemCount", "ptr", MenuGetHandle(obj.arr_menu)) = 1)
-            {
-                menuItemPath     := Path_FolderName(obj.arr_path)
-                menuName         := SubStr(obj.arr_menu,1,InStr(obj.arr_menu, "\",,-1)-1)
-                submenuName      := Substr(obj.arr_menu,Instr(obj.arr_menu,"\",,-1)+1)
-                Label_or_Submenu := ":" obj.arr_menu
-                Menu, % menuName, Add, % submenuName, % Label_or_Submenu
-                ; Msgbox % "2Menu, " menuName ", Add, " submenuName ", " Label_or_Submenu
+            menuItemPath     := obj.arr_path
+            menuName         := obj.arr_menu
+            submenuName      := obj.arr_item
+            Label_or_Submenu := "Menuhandler"
+            Menu % menuName, Add, % submenuName, % Label_or_Submenu
+            ; Msgbox % "1Menu " menuName ", Add, " submenuName ", " Label_or_Submenu
 
-                project_Lists[menuName] := path
-                ; msgbox % "2project_Lists[" submenuName "]:=" path
-                SetIcon(menuName,submenuName,menuItemPath)
+            project_Lists[menuName] := path
+            ; msgbox % "1project_Lists[" submenuName "]:=" path
+            SetIcon(menuName,submenuName,menuItemPath)
+
+            If InStr(obj.arr_menu, "\")
+            {
+                If (DllCall("GetMenuItemCount", "ptr", MenuGetHandle(obj.arr_menu)) = 1)
+                {
+                    menuItemPath     := Path_FolderName(obj.arr_path)
+                    menuName         := SubStr(obj.arr_menu,1,InStr(obj.arr_menu, "\",,-1)-1)
+                    submenuName      := Substr(obj.arr_menu,Instr(obj.arr_menu,"\",,-1)+1)
+                    Label_or_Submenu := ":" obj.arr_menu
+                    Menu, % menuName, Add, % submenuName, % Label_or_Submenu
+                    ; Msgbox % "2Menu, " menuName ", Add, " submenuName ", " Label_or_Submenu
+
+                    project_Lists[menuName] := path
+                    ; msgbox % "2project_Lists[" submenuName "]:=" path
+                    SetIcon(menuName,submenuName,menuItemPath)
+                }
             }
         }
+        Menu, % MainmenuName, Add, % MainMenuItem, % ":" Path_FileName(path)
+        SetIcon(MainmenuName,MainMenuItem,path)
     }
-
-    If Not MainMenuItem
-        MainMenuItem := Path_FileName(path)
-    Menu, % MainmenuName, Add, % MainMenuItem, % ":" Path_FileName(path)
-
     ; Menu, % Path_FileName(path), Show,0 ,0
     Return
 
@@ -198,9 +203,14 @@ GetDir(path) {
     arr:=[]
     Loop, Files, %path%\*, RDF
     {
-        If A_LoopFileAttrib contains H,R,S ;∫ˆ¬‘“˛≤ÿ°¢÷ª∂¡°¢œµÕ≥ Ù–‘µƒŒƒº˛
+        ; Skip any file that is either H (Hidden), R (Read-only), or S (System).
+        If A_LoopFileAttrib contains H,R,S
             Continue
-        If (A_LoopFileFullPath ~= ".*\.git\\*")
+        ; Skip /.git/ folder
+        If (A_LoopFileFullPath ~= "\.git\\*")
+            Continue
+        ; Skip /node_modules/ folder
+        If (A_LoopFileFullPath ~= "node_modules\\*")
             Continue
         arr.push({  arr_index:A_Index
                     ,arr_path:A_LoopFileFullPath
@@ -211,23 +221,51 @@ GetDir(path) {
 }
 ;---------------------------------------------------------------------------------------------------
 SetIcon(menuName,submenuName,menuItemPath) {
-    VarSetCapacity(fileinfo, fisize := A_PtrSize + 688)
-    if DllCall("shell32\SHGetFileInfoW", "Wstr", menuItemPath, "UInt", 0, "Ptr", &fileinfo, "UInt", fisize, "UInt", 0x100)
+    If (menuItemPath = A_Desktop)
     {
-        hicon := NumGet(fileinfo, 0, "Ptr")
-        Menu, %menuName%, Icon, %submenuName%, HICON:%hicon%
+        Menu, % menuName, Icon, % submenuName, imageres.dll,106
+    }
+    Else If (menuItemPath = "c:\")
+        Menu, % menuName, Icon, % submenuName, imageres.dll,32
+    Else If (menuItemPath ~= "i)\.ico$")
+        Menu, % menuName, Icon, % submenuName, % menuItemPath
+    Else If (IsFolderOrFile(menuItemPath) = "folder")
+    {
+        Menu, % menuName, Icon, % submenuName, imageres.dll,4
+    }
+    Else If (IsFolderOrFile(menuItemPath) = "disk")
+    {
+        Menu, % menuName, Icon, % submenuName, imageres.dll,31
+    }
+    Else
+    {
+        VarSetCapacity(fileinfo, fisize := A_PtrSize + 688)
+        if DllCall("shell32\SHGetFileInfoW", "Wstr", menuItemPath, "UInt", 0, "Ptr", &fileinfo, "UInt", fisize, "UInt", 0x100)
+        {
+            hicon := NumGet(fileinfo, 0, "Ptr")
+            Menu, % menuName, Icon, % submenuName, HICON:%hicon%
+        }
     }
 }
 ;---------------------------------------------------------------------------------------------------
-; StrIsFolderOrFile(path) {
-;     If FileExist(path)
-;     {
-;         If RegExMatch(path, "\\\\$")
-;             Return "folder"
-;         Else If FileExist(path . "\")
-;             Return "folder"
-;         Else
-;             Return "file"
-;     }
+IsFolderOrFile(path) {
+    If FileExist(path)
+    {
+        If path ~= "i)^[a-z]:\\$"
+            Return "disk"
+        Else If RegExMatch(path, "\\$")
+            Return "folder"
+        Else If FileExist(path . "\")
+            Return "folder"
+        Else
+            Return "file"
+    }
+}
+;---------------------------------------------------------------------------------------------------
+; Folder_IsEmptyOrNot(path) {
+;     If Folder_IsEmpty
+;         Return False
+;     Else
+;         Return True
 ; }
 ;---------------------------------------------------------------------------------------------------
