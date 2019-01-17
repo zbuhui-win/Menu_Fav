@@ -1,226 +1,214 @@
-/*
+/**
  * @Author  : Jiang Hui (jianghui@zigui.me)
  * @Link    :
  * @Version : 2019-01-13 10:25:04
  */
-
 #NoEnv
 #SingleInstance, force
-#NoTrayIcon
 Process, Priority, , High
 SetBatchLines, -1
 SetWorkingDir, % A_ScriptDir
+Menu, Tray, NoStandard
+Menu, Tray, Tip, Have Fun!
 
 SplitPath, A_ScriptFullPath, , OutDir, , OutNameNoExt
-ini          := % OutDir "\" OutNameNoExt ".ini"
-MainmenuName := "Fav_Folders"
-Menu, % MainmenuName, UseErrorLevel
+ini := % OutDir "\" OutNameNoExt ".ini"
+FileInstall, Menu_Fav.ini, Menu_Fav.ini
 ;---------------------------------------------------------------------------------------------------
-/*
-* Add Section [Project]
-*/
-IniRead, project, % ini, project
-project_Lists := {}
-If project
-{
-    Loop, Parse, % project, `n, `r
-    {
-        pos        := InStr(A_LoopField, "=", , , 1)
-        Menu_key   := SubStr(A_LoopField, 1, pos-1)
-        Menu_value := SubStr(A_LoopField, pos+1)
-        project_Lists[Menu_key] := Menu_value
+Global list_setting     := {}
+Global list_icon        := {}
+Global list_menu        := {}
+Global list_project     := {}
+Global arr_shortcut     := []
 
-        If FileExist(Menu_value)
-        {
-            Folder2Menu(Menu_value,MainmenuName,Menu_key)
+for index, section in ini(ini)
+{
+    If (section = "setting")
+        for key, value in ini_section(ini,section)
+            list_setting[key] := value
+    If (section = "icon"   )
+        for key, value in ini_section(ini,section)
+            list_icon[key]    := value
+    If (section = "menu"   )
+        for key, value in ini_section(ini,section)
+            list_menu[key]    := value
+    If (section = "project")
+        for key, value in ini_section(ini,section)
+            list_project[key] := value
+    If (section = "shortcut")
+    {
+        IniRead, shortcut, % ini, % section
+        Loop, Parse, % shortcut, `n, `t
+            arr_shortcut.push(A_LoopField)
         }
-    }
-    Menu, % MainmenuName, Add
 }
 ;---------------------------------------------------------------------------------------------------
-/*
-* Add Section [menu]
-*/
-IniRead, Menu_Items, % ini, Menu_Items
-Menu_Lists := {}
-If Menu_Items
+Global mainmenu_main := A_Now
+If !list_setting.showMenuerror
+    Menu, % mainmenu_main, UseErrorLevel
+;---------------------------------------------------------------------------------------------------
+/**
+ * Add Section [Project]
+ */
+If list_project
 {
-    Loop, parse, % Menu_Items, `n, `r
+    for key, value in list_project
     {
-        pos        := InStr(A_LoopField, "=", , , 1)
-        Menu_key   := SubStr(A_LoopField, 1, pos-1)
-        Menu_value := SubStr(A_LoopField, pos+1)
-        Menu_Lists[Menu_key] := Menu_value
+        If FileExist(value) && (key != OutNameNoExt)
+        {
+            Folder2Menu(value,mainmenu_main,key)
+            If FileExist(list_icon[key])
+                Menu, % mainmenu_main, Icon, % key, % list_icon[key]
+            Else If FileExist(value . "\" . FileName(value) . ".ico")
+                Menu, % mainmenu_main, Icon, % key, % value . "\" . FileName(value) . ".ico"
+            Else
+                Menu, % mainmenu_main, Icon, % key, imageres.dll,4
+        }
+    }
+    Menu, % mainmenu_main, Add
+}
+;---------------------------------------------------------------------------------------------------
+/**
+ * Add Section [menu]
+ */
+If list_menu
+{
+    for key, value in list_menu
+    {
+        If FileExist(value) && (key != OutNameNoExt)
+        {
+            Menu, % mainmenu_main, Add, % key, Label_Menu_Fav
 
-        Menu, % MainmenuName, Add, % Menu_key, Menu_Fav
-        If Not FileExist(Menu_value)
-        {
-            Menu, % MainmenuName, Disable, % Menu_key
-        }
-        Else
-        {
-            SetIcon(MainmenuName,Menu_key,Menu_value)
+            SetIconItself(mainmenu_main,key,value)
+            If FileExist(list_icon[key])
+                Menu, % mainmenu_main, Icon, % key, % list_icon[key]
         }
     }
-    Menu, % MainmenuName, Add
+    Menu, % mainmenu_main, Add
 }
-; For key, value in Menu_Lists
-;     MsgBox %key% = %value%
 ;---------------------------------------------------------------------------------------------------
-/*
-* Add Section [QuickPhrases]
-*/
-IniRead, QuickPhrases, % ini, QuickPhrases
-If QuickPhrases
+/**
+ * Add Section [shortcut]
+ */
+If arr_shortcut.Length()
 {
-    Loop, parse, % QuickPhrases, `n, `r
+    for index, value in arr_shortcut
     {
-        Menu, QuickPhrases, Add, % A_LoopField, Menu_Fav
+        If (value != OutNameNoExt)
+        {
+            Menu, shortcut, Add, % value, Label_Menu_Fav
+            ; SetIconRandom()
+        }
     }
-    Menu, % MainmenuName, Add, QuickPhrases, :QuickPhrases
-    Menu, % MainmenuName, Add
+    Menu, % mainmenu_main, Add, Shortcut, :shortcut
+    Menu, % mainmenu_main, Icon, Shortcut, % list_icon.shortcut
+    Menu, % mainmenu_main, Add
 }
 ;---------------------------------------------------------------------------------------------------
-/*
-* Add Section [Settings]
-*/
-IniRead, EditIcon  , % ini, Settings, EditIcon
-IniRead, ConfigIcon, % ini, Settings, ConfigIcon
+/**
+ * Add Section [Setting]
+ */
 If Not A_IsCompiled
 {
-    Menu, % MainmenuName, Add, &Edit, Menu_Fav
-    Menu, % MainmenuName, Icon, &Edit, % FileExist(EditIcon)?EditIcon:"", , 16
+    Folder2Menu(A_ScriptDir,mainmenu_main,OutNameNoExt)
+
+    Menu, % A_ScriptDir, Add
+    Menu, % A_ScriptDir, Add, Edit
+    Menu, % A_ScriptDir, Icon, Edit, % list_icon.edit
+    Menu, % A_ScriptDir, Add, Exit
+    Menu, % A_ScriptDir, Icon, Exit, % list_icon.exit
+    Menu, % A_ScriptDir, Add
+    Menu, % A_ScriptDir, Add, Config
+    Menu, % A_ScriptDir, Icon, Config, % list_icon.config
 }
-Menu, % MainmenuName, Add, &Config, Menu_Fav
-Menu, % MainmenuName, Icon, &Config, % FileExist(ConfigIcon)?ConfigIcon:"", , 16
-
-Menu, % MainmenuName, Show
-F1::Menu, % MainmenuName, Show
-Return
-
-
-Menu_Fav:
-    If FileExist(Menu_Lists[A_ThisMenuItem])
-    {
-        If WinActive("ahk_class CabinetWClass")
-        {
-            WinActivate, ahk_class CabinetWClass
-            ControlFocus, ToolbarWindow323
-            Sleep, 300
-            ControlSetText, Edit1, % Menu_Lists[A_ThisMenuItem]
-            Sleep, 300
-            ControlSend, Edit1, {Enter}
-        }
-        Else
-            Run % Menu_Lists[A_ThisMenuItem]
-    }
-    If (A_ThisMenuItem = "&Config")
-    {
-        If GetKeyState("Ctrl")
-            Run % OutDir
-        Else
-            Run % ini
-    }
-    If (A_ThisMenuItem = "&Edit")
-    {
-        If GetKeyState("Ctrl")
-            Run % OutDir
-        Else
-            Run % "Edit " A_ScriptFullPath
-    }
-    If (A_ThisMenu = "QuickPhrases") || (A_ThisMenu = "emoji")
-    {
-        Send % "{Bind}{Text}" A_ThisMenuItem
-    }
-    Return
 ;---------------------------------------------------------------------------------------------------
-/*
-*
-*/
-Folder2Menu(path,MainmenuName,MainMenuItem) {
-    If GetDir(path).Length()
+/**
+ * Set Script icon
+ */
+If FileExist(list_icon[OutNameNoExt])
+{
+    Menu, % mainmenu_main, Icon, % OutNameNoExt, % list_icon[OutNameNoExt]
+    Menu, Tray, Icon, % list_icon[OutNameNoExt], , 1
+}
+Else If FileExist(A_ScriptDir . "\" . OutNameNoExt . ".ico")
+{
+    Menu, % mainmenu_main, Icon, % OutNameNoExt, % A_ScriptDir . "\" . OutNameNoExt . ".ico"
+    Menu, Tray, Icon, % A_ScriptDir . "\" . OutNameNoExt . ".ico", , 1
+}
+Gosub, label_ShowMenu
+;---------------------------------------------------------------------------------------------------
+/**
+ * Set Hotkey
+ */
+If list_setting.hotkey
+{
+    Hotkey, % list_setting.hotkey, label_ShowMenu
+}
+Else
+    Hotkey, F1, label_ShowMenu
+Return
+;---------------------------------------------------------------------------------------------------
+/**
+ * Functions
+ */
+Folder2Menu(folder,mainmenu_main,mainmenu_sub) {
+    If CheckPath(folder).length()
     {
-        global project_Lists
-        for i, obj in GetDir(path)
+        for index, obj in Array_Reverse(CheckPath(folder))
         {
-            menuItemPath     := obj.arr_path
-            menuName         := obj.arr_menu
-            submenuName      := obj.arr_item
-            Label_or_Submenu := "Menuhandler"
-            Menu % menuName, Add, % submenuName, % Label_or_Submenu
-            ; Msgbox % "1Menu " menuName ", Add, " submenuName ", " Label_or_Submenu
-
-            project_Lists[menuName] := path
-            ; msgbox % "1project_Lists[" submenuName "]:=" path
-            SetIcon(menuName,submenuName,menuItemPath)
-
-            If InStr(obj.arr_menu, "\")
+            If (IsFolderOrFile(obj) = "file")
             {
-                If (DllCall("GetMenuItemCount", "ptr", MenuGetHandle(obj.arr_menu)) = 1)
-                {
-                    menuItemPath     := Path_FolderName(obj.arr_path)
-                    menuName         := SubStr(obj.arr_menu,1,InStr(obj.arr_menu, "\",,-1)-1)
-                    submenuName      := Substr(obj.arr_menu,Instr(obj.arr_menu,"\",,-1)+1)
-                    Label_or_Submenu := ":" obj.arr_menu
-                    Menu, % menuName, Add, % submenuName, % Label_or_Submenu
-                    ; Msgbox % "2Menu, " menuName ", Add, " submenuName ", " Label_or_Submenu
-
-                    project_Lists[menuName] := path
-                    ; msgbox % "2project_Lists[" submenuName "]:=" path
-                    SetIcon(menuName,submenuName,menuItemPath)
-                }
+                menu_main := Dir(obj)
+                menu_sub  := FileName(obj)
+                label     := "label_Folder2Menu"
+                Menu, % menu_main, Add, % menu_sub, % label
+                SetIconItself(menu_main,menu_sub,obj)
+            }
+            Else
+            {
+                menu_main := Dir(obj)
+                menu_sub  := FileName(obj)
+                label     := "label_Folder2Menu"
+                If (DllCall("GetMenuItemCount", "ptr", MenuGetHandle(obj))>0)
+                    label := ":" . obj
+                Menu, % menu_main, Add, % menu_sub, % label
+                SetIconItself(menu_main,menu_sub,obj)
             }
         }
-        Menu, % MainmenuName, Add, % MainMenuItem, % ":" Path_FileName(path)
-        SetIcon(MainmenuName,MainMenuItem,path)
+        Menu, % mainmenu_main, Add, % mainmenu_sub, % ":" . folder
     }
-    ; Menu, % Path_FileName(path), Show,0 ,0
-    Return
-
-    Menuhandler:
-        path := Path_FolderName(project_Lists[A_ThisMenu]) "\" A_ThisMenu "\" A_ThisMenuItem
-        If GetKeyState("Ctrl")
-            Run % Path_FolderName(path)
-        Else
-        {
-            ; MsgBox % "project_Lists[A_ThisMenuItem]:" project_Lists[A_ThisMenuItem] "`nA_ThisMenu: " A_ThisMenu "`nA_ThisMenuItem:" A_ThisMenuItem "`n`npath:" path
-            Run % path
-        }
-        Return
 }
 ;---------------------------------------------------------------------------------------------------
-Path_FileName(path) {
-    Return Trim(SubStr(path, InStr(path, "\", , -1)),"\")  ;文件名称
+FileName(path) {
+    If (IsFolderOrFile(path) = "drive")
+        Return path
+    SplitPath, path, OutFileName
+    Return OutFileName
 }
-Path_FolderName(path) {
-    Return Trim(SubStr(path, 1, InStr(path, "\", , -1)),"\") ;文件路径
+Dir(path) {
+    If (IsFolderOrFile(path) = "drive")
+        Return path
+    SplitPath, path, , OutDir
+    Return OutDir
 }
-Getfilename(path) {
-    SplitPath, path, , , , OutNameNoExt
-    Return OutNameNoExt
-}
-GetDir(path) {
-    arr:=[]
-    Loop, Files, %path%\*, RDF
+;---------------------------------------------------------------------------------------------------
+CheckPath(folder) {
+    path := []
+    Loop, Files, %folder%\*, RDF
     {
         ; Skip any file that is either H (Hidden), R (Read-only), or S (System).
         If A_LoopFileAttrib contains H,R,S
             Continue
-        ; Skip /.git/ folder
         If (A_LoopFileFullPath ~= "\.git\\*")
             Continue
-        ; Skip /node_modules/ folder
         If (A_LoopFileFullPath ~= "node_modules\\*")
             Continue
-        arr.push({  arr_index:A_Index
-                    ,arr_path:A_LoopFileFullPath
-                    ,arr_menu:Path_FolderName(StrReplace(A_LoopFileFullPath, Path_FolderName(path)))
-                    ,arr_item:Path_FileName(A_LoopFileFullPath)})
+        path.push(A_LoopFileFullPath)
     }
-    Return arr
+    Return path
 }
 ;---------------------------------------------------------------------------------------------------
-SetIcon(menuName,submenuName,menuItemPath) {
+SetIconItself(menuName,submenuName,menuItemPath) {
     If (menuItemPath = A_Desktop)
     {
         Menu, % menuName, Icon, % submenuName, imageres.dll,106
@@ -231,9 +219,16 @@ SetIcon(menuName,submenuName,menuItemPath) {
         Menu, % menuName, Icon, % submenuName, % menuItemPath
     Else If (IsFolderOrFile(menuItemPath) = "folder")
     {
-        Menu, % menuName, Icon, % submenuName, imageres.dll,4
+        ico := menuItemPath "\" FileName(menuItemPath) ".ico"
+        exe := menuItemPath "\" FileName(menuItemPath) ".exe"
+        If FileExist(ico)
+            Menu, % menuName, Icon, % submenuName, % ico
+        Else If FileExist(exe)
+            Menu, % menuName, Icon, % submenuName, % exe
+        Else
+            Menu, % menuName, Icon, % submenuName, imageres.dll,4
     }
-    Else If (IsFolderOrFile(menuItemPath) = "disk")
+    Else If (IsFolderOrFile(menuItemPath) = "drive")
     {
         Menu, % menuName, Icon, % submenuName, imageres.dll,31
     }
@@ -252,7 +247,7 @@ IsFolderOrFile(path) {
     If FileExist(path)
     {
         If path ~= "i)^[a-z]:\\$"
-            Return "disk"
+            Return "drive"
         Else If RegExMatch(path, "\\$")
             Return "folder"
         Else If FileExist(path . "\")
@@ -262,10 +257,100 @@ IsFolderOrFile(path) {
     }
 }
 ;---------------------------------------------------------------------------------------------------
-; Folder_IsEmptyOrNot(path) {
-;     If Folder_IsEmpty
-;         Return False
-;     Else
-;         Return True
-; }
+ini(ini) {
+    IniRead, ini, % ini
+    array := []
+    Loop, Parse, % ini, `n, `r
+    {
+        array.Insert(A_LoopField)
+    }
+    Return array
+}
+ini_section(ini,section) {
+    IniRead, section, % ini, % section
+    list := {}
+    If section
+    {
+        Loop, Parse, % section, `n, `r
+        {
+            pos := InStr(A_LoopField, "=")
+            If pos
+            {
+                key       := SubStr(A_LoopField, 1, pos-1)
+                value     := SubStr(A_LoopField, pos+1)
+                list[key] := value
+            }
+        }
+        Return list
+    }
+}
+;---------------------------------------------------------------------------------------------------
+Array_Reverse(arr) {
+    Reverse := []
+    Loop % len:=arr.maxindex()
+    {
+        Reverse[len-A_Index+1] := arr[A_Index]
+    }
+    Return Reverse
+}
+;---------------------------------------------------------------------------------------------------
+TB_HIDEBUTTON(wParam, lParam) {
+    static WM_USER := 0x400
+    static _______ := OnMessage(WM_USER + 4, "TB_HIDEBUTTON")
+    If (lParam = 513)
+        Run % A_ScriptDir
+    If (lParam = 516)
+        Gosub, label_ShowMenu
+    If (lParam = 519)
+        Run % A_ScriptDir
+}
+;---------------------------------------------------------------------------------------------------
+label_ShowMenu:
+    Menu, % mainmenu_main, Show
+    Return
+Edit:
+    Edit
+    Return
+Exit:
+    ExitApp
+    Return
+Config:
+    Run % ini
+    Return
+label_Folder2Menu:
+    If GetKeyState("ctrl")
+    {
+        Run % A_ThisMenu
+    }
+    /**
+    * #TODO#
+    *
+    */
+    Else If GetKeyState("shift")
+    {}
+    Else
+        Run % A_ThisMenu "\" A_ThisMenuItem
+    Return
+Label_Menu_Fav:
+    If GetKeyState("ctrl")
+    {
+        If (A_ThisMenu = mainmenu_main) && FileExist(list_menu[A_ThisMenuItem])
+            Run % Dir(list_menu[A_ThisMenuItem])
+        Else If (A_ThisMenu = "shortcut")
+            Gosub, Config
+    }
+    /**
+    * #TODO#
+    *
+    */
+    Else If GetKeyState("shift")
+    {}
+    Else
+    {
+        If (A_ThisMenu = mainmenu_main) && FileExist(list_menu[A_ThisMenuItem])
+            Run % list_menu[A_ThisMenuItem]
+        Else If (A_ThisMenu = "shortcut")
+            Send % "{Bind}{Text}" A_ThisMenuItem
+    }
+    Return
 ;---------------------------------------------------------------------------------------------------
