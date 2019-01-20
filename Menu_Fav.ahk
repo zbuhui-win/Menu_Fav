@@ -3,7 +3,15 @@
  * @Link    :
  * @Version : 2019-01-13 10:25:04
  */
+
+/**
+ * warning!
+ * The names of menus and menu items can be up to 260 characters long.
+ * This Script didn't consider about it so far.
+ * may fix it by using menu id and store the path in global array/list.
+*/
 #NoEnv
+#NoTrayIcon
 #SingleInstance, force
 Process, Priority, , High
 SetBatchLines, -1
@@ -44,6 +52,7 @@ for index, section in ini(ini)
 }
 ;---------------------------------------------------------------------------------------------------
 Global mainmenu_main := A_Now
+Menu, Tray, UseErrorLevel
 If !list_setting.showMenuerror
     Menu, % mainmenu_main, UseErrorLevel
 ;---------------------------------------------------------------------------------------------------
@@ -113,28 +122,24 @@ If Not A_IsCompiled
     Folder2Menu(A_ScriptDir,mainmenu_main,OutNameNoExt)
 
     Menu, % A_ScriptDir, Add
-    Menu, % A_ScriptDir, Add, Edit
-    Menu, % A_ScriptDir, Icon, Edit, % list_icon.edit
     Menu, % A_ScriptDir, Add, Exit
     Menu, % A_ScriptDir, Icon, Exit, % list_icon.exit
-    Menu, % A_ScriptDir, Add
-    Menu, % A_ScriptDir, Add, Config
-    Menu, % A_ScriptDir, Icon, Config, % list_icon.config
 }
 ;---------------------------------------------------------------------------------------------------
 /**
  * Set Script icon
  */
-If FileExist(list_icon[OutNameNoExt])
-{
-    Menu, % mainmenu_main, Icon, % OutNameNoExt, % list_icon[OutNameNoExt]
-    Menu, Tray, Icon, % list_icon[OutNameNoExt], , 1
-}
-Else If FileExist(A_ScriptDir . "\" . OutNameNoExt . ".ico")
-{
-    Menu, % mainmenu_main, Icon, % OutNameNoExt, % A_ScriptDir . "\" . OutNameNoExt . ".ico"
-    Menu, Tray, Icon, % A_ScriptDir . "\" . OutNameNoExt . ".ico", , 1
-}
+; If FileExist(list_icon[OutNameNoExt])
+; {
+;     Menu, % mainmenu_main, Icon, % OutNameNoExt, % list_icon[OutNameNoExt]
+;     Menu, Tray, Icon, % list_icon[OutNameNoExt], , 1
+; }
+; Else If FileExist(A_ScriptDir . "\" . OutNameNoExt . ".ico")
+; {
+;     Menu, % mainmenu_main, Icon, % OutNameNoExt, % A_ScriptDir . "\" . OutNameNoExt . ".ico"
+;     Menu, Tray, Icon, % A_ScriptDir . "\" . OutNameNoExt . ".ico", , 1
+; }
+SetIconItself(mainmenu_main,"Menu_Fav",A_ScriptDir)
 Gosub, label_ShowMenu
 ;---------------------------------------------------------------------------------------------------
 /**
@@ -144,9 +149,21 @@ If list_setting.hotkey
 {
     Hotkey, % list_setting.hotkey, label_ShowMenu
 }
-Else
-    Hotkey, F1, label_ShowMenu
+; Else
+;     Hotkey, F1, label_ShowMenu
+;---------------------------------------------------------------------------------------------------
+; 示例: 此脚本能接收到其他脚本或程序的自定义消息和最多两个数字
+; (要发送字符串而不是数字, 请参阅下一个示例).
+OnMessage(0x5555, "MsgMonitor")
 Return
+
+MsgMonitor(wParam, lParam, msg) {
+    ; 由于尽快返回常常很重要, 所以最好使用 ToolTip 而不是
+    ; 类似 MsgBox 的进行显示, 以避免阻止函数结束:
+    ; ToolTip Message %msg% arrived:`nWPARAM: %wParam%`nLPARAM: %lParam%
+    If (msg = 0x5555 && wParam = 11 && lParam = 22)
+        Gosub, label_ShowMenu
+}
 ;---------------------------------------------------------------------------------------------------
 /**
  * Functions
@@ -294,28 +311,22 @@ Array_Reverse(arr) {
     Return Reverse
 }
 ;---------------------------------------------------------------------------------------------------
-TB_HIDEBUTTON(wParam, lParam) {
-    static WM_USER := 0x400
-    static _______ := OnMessage(WM_USER + 4, "TB_HIDEBUTTON")
-    If (lParam = 513)
-        Run % A_ScriptDir
-    If (lParam = 516)
-        Gosub, label_ShowMenu
-    If (lParam = 519)
-        Run % A_ScriptDir
-}
+; TB_HIDEBUTTON(wParam, lParam) {
+;     static WM_USER := 0x400
+;     static _______ := OnMessage(WM_USER + 4, "TB_HIDEBUTTON")
+;     If (lParam = 513)
+;         Return
+;     If (lParam = 514)
+;         Return
+;     If (lParam = 516)
+;         Return
+; }
 ;---------------------------------------------------------------------------------------------------
 label_ShowMenu:
     Menu, % mainmenu_main, Show
     Return
-Edit:
-    Edit
-    Return
 Exit:
     ExitApp
-    Return
-Config:
-    Run % ini
     Return
 label_Folder2Menu:
     If GetKeyState("ctrl")
@@ -327,7 +338,10 @@ label_Folder2Menu:
     *
     */
     Else If GetKeyState("shift")
-    {}
+    {
+        If A_ThisMenuItem ~= ".ahk"
+            Run % "Edit " A_ThisMenu "\" A_ThisMenuItem
+    }
     Else
         Run % A_ThisMenu "\" A_ThisMenuItem
     Return
@@ -337,20 +351,28 @@ Label_Menu_Fav:
         If (A_ThisMenu = mainmenu_main) && FileExist(list_menu[A_ThisMenuItem])
             Run % Dir(list_menu[A_ThisMenuItem])
         Else If (A_ThisMenu = "shortcut")
-            Gosub, Config
+            Run % ini
     }
     /**
     * #TODO#
     *
     */
     Else If GetKeyState("shift")
-    {}
+    {
+        If A_ThisMenuItem ~= ".ahk"
+            Run % "Edit " A_ThisMenu "\" A_ThisMenuItem
+    }
     Else
     {
         If (A_ThisMenu = mainmenu_main) && FileExist(list_menu[A_ThisMenuItem])
-            Run % list_menu[A_ThisMenuItem]
+        {
+            If list_menu[A_ThisMenuItem] ~= ".ahk"
+                Run % list_menu[A_ThisMenuItem]
+            Else
+                Run % list_menu[A_ThisMenuItem]
+        }
         Else If (A_ThisMenu = "shortcut")
-            Send % "{Bind}{Text}" A_ThisMenuItem
+            Send % "{Blind}{Text}" A_ThisMenuItem
     }
     Return
 ;---------------------------------------------------------------------------------------------------
