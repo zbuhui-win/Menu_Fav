@@ -28,6 +28,15 @@ Global list_icon        := {}
 Global list_menu        := {}
 Global list_project     := {}
 Global arr_shortcut     := []
+Global Activatewindows
+Activatewindows=C:\Windows\explorer.exe
+,C:\Windows\SysWOW64\hh.exe
+,C:\Program Files\Typora\Typora.exe
+,C:\Program Files\Microsoft VS Code\Code.exe
+,C:\Program Files\Mozilla Firefox\firefox.exe
+,C:\Program Files (x86)\Tencent\TIM\Bin\TIM.exe
+,C:\Program Files (x86)\Google\Chrome\Application\chrome.exe
+,C:\Windows\System32\notepad.exe
 
 for index, section in ini(ini)
 {
@@ -50,6 +59,9 @@ for index, section in ini(ini)
             arr_shortcut.push(A_LoopField)
         }
 }
+;---------------------------------------------------------------------------------------------------
+If list_setting.Activatewindows
+    Activatewindows := list_setting.Activatewindows
 ;---------------------------------------------------------------------------------------------------
 Global mainmenu_main := A_Now
 Menu, Tray, UseErrorLevel
@@ -152,17 +164,22 @@ If list_setting.hotkey
 ; Else
 ;     Hotkey, F1, label_ShowMenu
 ;---------------------------------------------------------------------------------------------------
-; 示例: 此脚本能接收到其他脚本或程序的自定义消息和最多两个数字
-; (要发送字符串而不是数字, 请参阅下一个示例).
 OnMessage(0x5555, "MsgMonitor")
+OnMessage(0x5556, "MsgMonitor")
 Return
 
 MsgMonitor(wParam, lParam, msg) {
-    ; 由于尽快返回常常很重要, 所以最好使用 ToolTip 而不是
-    ; 类似 MsgBox 的进行显示, 以避免阻止函数结束:
-    ; ToolTip Message %msg% arrived:`nWPARAM: %wParam%`nLPARAM: %lParam%
+    ; get message from Menu_Call_Menu.ahk
     If (msg = 0x5555 && wParam = 11 && lParam = 22)
         Gosub, label_ShowMenu
+    ; get message from Menu_Call_Win.ahk
+    Else If (msg = 0x5556 && wParam = 11 && lParam = 22)
+    {
+        Gosub, label_CreateMenu_Win
+        Menu, Windows, Show
+    }
+
+
 }
 ;---------------------------------------------------------------------------------------------------
 /**
@@ -233,6 +250,10 @@ SetIconItself(menuName,submenuName,menuItemPath) {
     Else If (menuItemPath = "c:\")
         Menu, % menuName, Icon, % submenuName, imageres.dll,32
     Else If (menuItemPath ~= "i)\.ico$")
+        Menu, % menuName, Icon, % submenuName, % menuItemPath
+    Else If (menuItemPath ~= "i)\.png$")
+        Menu, % menuName, Icon, % submenuName, % menuItemPath
+    Else If (menuItemPath ~= "i)\.jpg$")
         Menu, % menuName, Icon, % submenuName, % menuItemPath
     Else If (IsFolderOrFile(menuItemPath) = "folder")
     {
@@ -311,19 +332,26 @@ Array_Reverse(arr) {
     Return Reverse
 }
 ;---------------------------------------------------------------------------------------------------
-; TB_HIDEBUTTON(wParam, lParam) {
-;     static WM_USER := 0x400
-;     static _______ := OnMessage(WM_USER + 4, "TB_HIDEBUTTON")
-;     If (lParam = 513)
-;         Return
-;     If (lParam = 514)
-;         Return
-;     If (lParam = 516)
-;         Return
-; }
-;---------------------------------------------------------------------------------------------------
 label_ShowMenu:
+    Gosub, label_CreateMenu_Win
+    Menu, % mainmenu_main, Add, Windows, :Windows
     Menu, % mainmenu_main, Show
+    Return
+label_CreateMenu_Win:
+    Menu, Windows, Add
+    Menu, Windows, DeleteAll
+    for key,value in getActivatedWindows()
+    {
+        if value in % Activatewindows
+        {
+            menu, Windows, Add, % key, Label_Activatewindows
+            SetIconItself("Windows",key,value)
+        }
+    }
+    Return
+Label_Activatewindows:
+    RegExMatch(A_ThisMenuItem, "0x[a-fA-F0-9]+", ahk_id)
+    WinActivate, % "ahk_id " ahk_id
     Return
 Exit:
     ExitApp
@@ -372,7 +400,36 @@ Label_Menu_Fav:
                 Run % list_menu[A_ThisMenuItem]
         }
         Else If (A_ThisMenu = "shortcut")
-            Send % "{Blind}{Text}" A_ThisMenuItem
+            Send % "{Blind}{Text} " A_ThisMenuItem
     }
     Return
 ;---------------------------------------------------------------------------------------------------
+getActivatedWindows() {
+    list_ActivatedWindows:={}
+    WinGet, id, List,,, Program Manager
+    Loop % id
+    {
+        this_id := id%A_Index%
+        WinGetTitle, this_title, % "ahk_id " this_id
+        WinGet, ProcessPath, ProcessPath, % "ahk_id " this_id
+        If this_title
+            list_ActivatedWindows[Rpad(this_id,9) A_Tab this_title] := ProcessPath
+    }
+    Return list_ActivatedWindows
+}
+Rpad(str,num,span:=" ") {
+    if (num > StrLen(str))
+    {
+        Loop, % num
+            str := str . span
+        return % SubStr(str, 1, num)
+    }
+}
+Lpad(str,num,span:=" ") {
+    if (num > StrLen(str))
+    {
+        Loop, % num-StrLen(str)
+            str := span . str
+        return % SubStr(str, 1-num)
+    }
+}
