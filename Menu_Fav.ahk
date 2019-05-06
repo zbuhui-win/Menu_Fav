@@ -11,23 +11,24 @@
  * may fix it by using menu id and store the path in global array/list.
 */
 #NoEnv
-#NoTrayIcon
+; #NoTrayIcon
 #SingleInstance, force
 Process, Priority, , High
 SetBatchLines, -1
 SetWorkingDir, % A_ScriptDir
-Menu, Tray, NoStandard
-Menu, Tray, Tip, Have Fun!
 
 SplitPath, A_ScriptFullPath, , OutDir, , OutNameNoExt
 ini := % OutDir "\" OutNameNoExt ".ini"
 FileInstall, Menu_Fav.ini, Menu_Fav.ini
+
+Menu, Tray, UseErrorLevel
+; Menu, Tray, NoStandard
+Menu, Tray, Icon, %OutNameNoExt%.ico
+Menu, Tray, Tip, Have Fun!
 ;---------------------------------------------------------------------------------------------------
 Global list_setting     := {}
-Global list_icon        := {}
 Global list_menu        := {}
 Global list_project     := {}
-Global arr_shortcut     := []
 Global Activatewindows
 Activatewindows=C:\Windows\explorer.exe
 ,C:\Windows\SysWOW64\hh.exe
@@ -43,30 +44,18 @@ for index, section in ini(ini)
     If (section = "setting")
         for key, value in ini_section(ini,section)
             list_setting[key] := value
-    If (section = "icon"   )
-        for key, value in ini_section(ini,section)
-            list_icon[key]    := value
-    If (section = "menu"   )
+    If (section = "menu")
         for key, value in ini_section(ini,section)
             list_menu[key]    := value
     If (section = "project")
         for key, value in ini_section(ini,section)
             list_project[key] := value
-    If (section = "shortcut")
-    {
-        IniRead, shortcut, % ini, % section
-        Loop, Parse, % shortcut, `n, `t
-            arr_shortcut.push(A_LoopField)
-        }
 }
 ;---------------------------------------------------------------------------------------------------
 If list_setting.Activatewindows
     Activatewindows := list_setting.Activatewindows
 ;---------------------------------------------------------------------------------------------------
 Global mainmenu_main := A_Now
-Menu, Tray, UseErrorLevel
-If !list_setting.showMenuerror
-    Menu, % mainmenu_main, UseErrorLevel
 ;---------------------------------------------------------------------------------------------------
 /**
  * Add Section [Project]
@@ -75,7 +64,7 @@ If list_project
 {
     for key, value in list_project
     {
-        If FileExist(value) && (key != OutNameNoExt)
+        If FileExist(value)
         {
             Folder2Menu(value,mainmenu_main,key)
             If FileExist(list_icon[key])
@@ -92,66 +81,26 @@ If list_project
 /**
  * Add Section [menu]
  */
-If list_menu
+IniRead, menu, % ini, menu
+Loop, Parse, % menu, `n, `r
 {
-    for key, value in list_menu
+    line := A_LoopField
+    key := SubStr(A_LoopField, 1, Instr(A_LoopField, "=")-1)
+    value := SubStr(A_LoopField, Instr(A_LoopField, "=")+1)
+    If FileExist(value)
     {
-        If FileExist(value) && (key != OutNameNoExt)
-        {
-            Menu, % mainmenu_main, Add, % key, Label_Menu_Fav
-
-            SetIconItself(mainmenu_main,key,value)
-            If FileExist(list_icon[key])
-                Menu, % mainmenu_main, Icon, % key, % list_icon[key]
-        }
+        Menu, % mainmenu_main, Add, % key, Label_Menu_Fav
+        SetIconItself(mainmenu_main,key,value)
+        If FileExist(list_icon[key])
+            Menu, % mainmenu_main, Icon, % key, % list_icon[key]
     }
-    Menu, % mainmenu_main, Add
-}
-;---------------------------------------------------------------------------------------------------
-/**
- * Add Section [shortcut]
- */
-If arr_shortcut.Length()
-{
-    for index, value in arr_shortcut
+    Else
     {
-        If (value != OutNameNoExt)
-        {
-            Menu, shortcut, Add, % value, Label_Menu_Fav
-            ; SetIconRandom()
-        }
+        Menu, % mainmenu_main, Add, % key, Label_Menu_Fav
+        Menu, % mainmenu_main, Disable, % key
     }
-    Menu, % mainmenu_main, Add, Shortcut, :shortcut
-    Menu, % mainmenu_main, Icon, Shortcut, % list_icon.shortcut
-    Menu, % mainmenu_main, Add
 }
 ;---------------------------------------------------------------------------------------------------
-/**
- * Add Section [Setting]
- */
-If Not A_IsCompiled
-{
-    Folder2Menu(A_ScriptDir,mainmenu_main,OutNameNoExt)
-
-    Menu, % A_ScriptDir, Add
-    Menu, % A_ScriptDir, Add, Exit
-    Menu, % A_ScriptDir, Icon, Exit, % list_icon.exit
-}
-;---------------------------------------------------------------------------------------------------
-/**
- * Set Script icon
- */
-; If FileExist(list_icon[OutNameNoExt])
-; {
-;     Menu, % mainmenu_main, Icon, % OutNameNoExt, % list_icon[OutNameNoExt]
-;     Menu, Tray, Icon, % list_icon[OutNameNoExt], , 1
-; }
-; Else If FileExist(A_ScriptDir . "\" . OutNameNoExt . ".ico")
-; {
-;     Menu, % mainmenu_main, Icon, % OutNameNoExt, % A_ScriptDir . "\" . OutNameNoExt . ".ico"
-;     Menu, Tray, Icon, % A_ScriptDir . "\" . OutNameNoExt . ".ico", , 1
-; }
-SetIconItself(mainmenu_main,"Menu_Fav",A_ScriptDir)
 Gosub, label_ShowMenu
 ;---------------------------------------------------------------------------------------------------
 /**
@@ -161,8 +110,6 @@ If list_setting.hotkey
 {
     Hotkey, % list_setting.hotkey, label_ShowMenu
 }
-; Else
-;     Hotkey, F1, label_ShowMenu
 ;---------------------------------------------------------------------------------------------------
 OnMessage(0x5555, "MsgMonitor")
 OnMessage(0x5556, "MsgMonitor")
@@ -178,8 +125,6 @@ MsgMonitor(wParam, lParam, msg) {
         Gosub, label_CreateMenu_Win
         Menu, Windows, Show
     }
-
-
 }
 ;---------------------------------------------------------------------------------------------------
 /**
@@ -334,7 +279,7 @@ Array_Reverse(arr) {
 ;---------------------------------------------------------------------------------------------------
 label_ShowMenu:
     Gosub, label_CreateMenu_Win
-    Menu, % mainmenu_main, Add, Windows, :Windows
+    ; Menu, % mainmenu_main, Add, Windows, :Windows
     Menu, % mainmenu_main, Show
     Return
 label_CreateMenu_Win:
@@ -352,9 +297,6 @@ label_CreateMenu_Win:
 Label_Activatewindows:
     RegExMatch(A_ThisMenuItem, "0x[a-fA-F0-9]+", ahk_id)
     WinActivate, % "ahk_id " ahk_id
-    Return
-Exit:
-    ExitApp
     Return
 label_Folder2Menu:
     If GetKeyState("ctrl")
@@ -423,13 +365,5 @@ Rpad(str,num,span:=" ") {
         Loop, % num
             str := str . span
         return % SubStr(str, 1, num)
-    }
-}
-Lpad(str,num,span:=" ") {
-    if (num > StrLen(str))
-    {
-        Loop, % num-StrLen(str)
-            str := span . str
-        return % SubStr(str, 1-num)
     }
 }
